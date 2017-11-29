@@ -72,6 +72,7 @@ typedef struct {
 #ifdef XILINX
 #include "pipe.cl" // for xilinx, the channels are defined here by using pipes
 #else
+#pragma OPENCL EXTENSION cl_intel_channels : enable
 channel channel_vec    data_ch    __attribute__((depth(0)));
 channel channel_vec    weight_ch  __attribute__((depth(0)));
 channel channel_scal   bias_ch    __attribute__((depth(8)));
@@ -388,7 +389,7 @@ void memRead(
                                     bias_ch_write_pipe_block(bias_ch_in);
 #else
 									bias_ch_in = bias[out_idx_z];
-									write_channel_altera(bias_ch, bias_ch_in);
+									write_channel_intel(bias_ch, bias_ch_in);
 #endif
 									//#ifdef DEBUG_MEMRD
 									//printf("work-item x=%d, y=%d, z=%d, channel =0, write bias=%f\n", output_idx_dim1, output_idx_dim2, output_idx_dim3, bias_ch_in.lane[0]);
@@ -427,10 +428,10 @@ void memRead(
 								for(unsigned char ll=0; ll<LANE_NUM; ll++){
 									data_ch_vec.lane[ll] = data_vec;
 								}
-								write_channel_altera(data_ch, data_ch_vec);	
+								write_channel_intel(data_ch, data_ch_vec);	
 								
 								weight_ch_vec = weight_buffer[output_idx_dim3*weight_dim2*weight_dim1 + output_idx_dim2*weight_dim1 + output_idx_dim1];
-								write_channel_altera(weight_ch, weight_ch_vec);	
+								write_channel_intel(weight_ch, weight_ch_vec);	
 #endif
 								#ifdef DEBUG_MEMRD
 								//if(gp_num_x==group_num_x-1 && gp_num_y==0 && out_idx_z==0){
@@ -543,7 +544,7 @@ void coreConv(
 #ifdef XILINX
         bias_ch_read_pipe_block(bias_ch_out);
 #else		
-		bias_ch_out = read_channel_altera(bias_ch);
+		bias_ch_out = read_channel_intel(bias_ch);
 #endif
 
 #ifdef XILINX
@@ -574,8 +575,8 @@ void coreConv(
             data_read_pipe_block(mac_data);
             weight_read_pipe_block(mac_weight);
 #else
-			mac_data = read_channel_altera(data_ch);
-			mac_weight = read_channel_altera(weight_ch);
+			mac_data = read_channel_intel(data_ch);
+			mac_weight = read_channel_intel(weight_ch);
 #endif
 
 			// add results from all lanes
@@ -666,14 +667,14 @@ void coreConv(
 #ifdef XILINX
             bypass_ch_write_pipe_block(conv_ch_in);
 #else
-			write_channel_altera(bypass_ch, conv_ch_in);
+			write_channel_intel(bypass_ch, conv_ch_in);
 #endif
 			}
 			else{ // to pooling kernel
 #ifdef XILINX
             conv_ch_write_pipe_block(conv_ch_in);
 #else
-			write_channel_altera(conv_ch, conv_ch_in);
+			write_channel_intel(conv_ch, conv_ch_in);
 #endif
 			}
 			//printf("Write channel item-%d is written in channel %d...\n", k, ll);
@@ -731,7 +732,7 @@ void maxPool(
 #ifdef XILINX
         conv_ch_read_pipe_block(conv_ch_out);
 #else
-		conv_ch_out = read_channel_altera(conv_ch);
+		conv_ch_out = read_channel_intel(conv_ch);
 #endif
 		// Two line buffer to form the 3x3 pooling window
 		// First read from line buffer for pooling and then write new line into the line buffer
@@ -786,7 +787,7 @@ void maxPool(
 #ifdef XILINX
                 pool_ch_write_pipe_block(pool_final);
 #else				
-				write_channel_altera(pool_ch, pool_final);
+				write_channel_intel(pool_ch, pool_final);
 #endif
 				#ifdef DEBUG_POOL
 				printf("        reg0=%f, reg1=%f, reg2=%f, max=%f\n", (float)pool_reg[0][0], (float)pool_reg[0][1], (float)pool_reg[0][2], (float)pool_final.lane[0]);
@@ -907,9 +908,9 @@ void memWrite(
 	// use the first local work-item to read the vectorized output data from channel
 	if(local_z==0){
 		if((bypass&0x01)==0x01)
-			output = read_channel_altera(bypass_ch);
+			output = read_channel_intel(bypass_ch);
 		else
-			output = read_channel_altera(pool_ch);
+			output = read_channel_intel(pool_ch);
 
 		// store the vectorized output into local buffer
 		#pragma unroll
